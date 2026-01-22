@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Family Day Lucky Draw - Wheel Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Quicksand:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Quicksand', sans-serif;
+            background: #f0f2f5;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        h1, h2, .winner-name {
+            font-family: 'Fredoka One', cursive;
+        }
+
+        .card {
+            background: #ffffff;
+            border-radius: 24px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .confetti {
+            position: fixed;
+            width: 10px;
+            height: 10px;
+            z-index: 1000;
+            animation: fall 3s ease-in-out infinite;
+        }
+
+        @keyframes fall {
+            0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+        }
+
+        .decoration {
+            position: absolute;
+            bottom: -100px;
+            animation: float 6s ease-in infinite;
+            z-index: -1;
+            pointer-events: none;
+            user-select: none;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0) rotate(0deg); }
+            100% { transform: translateY(-130vh) rotate(20deg); }
+        }
+
+        .winner-overlay {
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            text-align: center;
+        }
+
+        #wheel-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+            cursor: pointer;
+            user-select: none;
+            transition: transform 0.2s;
+        }
+
+        #wheel-container:hover {
+            transform: scale(1.01);
+        }
+
+        #wheel-container:active {
+            transform: scale(0.98);
+        }
+
+        #wheel-pointer {
+            position: absolute;
+            right: -10px;
+            top: 50%;
+            transform: translateY(-50%) rotate(-90deg);
+            width: 60px;
+            height: 60px;
+            z-index: 20;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
+            transform-origin: center center;
+            transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .pointer-flick {
+            transform: translateY(-50%) rotate(-110deg) !important;
+        }
+
+        /* Side Drawer Styling */
+        #side-drawer {
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 60;
+        }
+        .drawer-hidden {
+            transform: translateX(-100%);
+        }
+        .drawer-visible {
+            transform: translateX(0);
+        }
+
+        canvas {
+            filter: drop-shadow(0 10px 15px rgba(0,0,0,0.1));
+            max-height: 70vh;
+        }
+
+        /* Custom Scrollbar */
+        .custom-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: #e2e8f0;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div id="decoration-container" class="fixed inset-0 pointer-events-none -z-10"></div>
+
+    <!-- Side Drawer for Adding Names -->
+    <div id="side-drawer" class="fixed inset-y-0 left-0 w-80 bg-white shadow-2xl drawer-hidden border-r border-gray-200 overflow-y-auto">
+        <div class="p-6 h-full flex flex-col">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl text-gray-800 font-bold flex items-center">
+                    <span class="mr-2">📝</span> Participants
+                </h2>
+                <button onclick="toggleDrawer()" class="text-gray-400 hover:text-red-500 text-3xl font-light">&times;</button>
+            </div>
+            
+            <!-- Individual Add Input -->
+            <div class="mb-4">
+                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Add Participant</label>
+                <div class="flex gap-2">
+                    <input type="text" id="addNameInput" onkeydown="if(event.key==='Enter') addParticipant()" class="flex-grow p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-sm" placeholder="Type name...">
+                    <button onclick="addParticipant()" class="bg-blue-600 text-white px-4 rounded-xl hover:bg-blue-700 transition">Add</button>
+                </div>
+            </div>
+
+            <!-- Search Function -->
+            <div class="mb-4">
+                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Search Pool</label>
+                <div class="relative">
+                    <input type="text" id="searchInput" oninput="renderParticipantList()" class="w-full p-3 pl-10 border border-gray-200 rounded-xl focus:ring-2 focus:ring-gray-300 focus:outline-none shadow-sm" placeholder="Find a name...">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 absolute left-3 top-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Scrollable List of Participants -->
+            <div class="flex-grow overflow-hidden flex flex-col">
+                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Participant List (<span id="countDisplay">0</span>)</label>
+                <div id="participantList" class="flex-grow overflow-y-auto custom-scroll pr-1 space-y-2 pb-4">
+                    <!-- Names rendered here -->
+                </div>
+            </div>
+            
+            <button onclick="toggleDrawer()" class="w-full mt-6 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition">
+                Apply & Close
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Dashboard Wrapper -->
+    <div class="max-w-7xl mx-auto w-full flex flex-col h-full">
+        <!-- Header: Fixed height -->
+        <header class="flex flex-col md:flex-row items-center justify-between mb-6 gap-4 shrink-0">
+            <div class="flex items-center gap-3">
+                <button onclick="toggleDrawer()" class="p-3 bg-white rounded-xl shadow-sm border border-gray-100 hover:bg-gray-50 transition" title="Menu">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                </button>
+                <button onclick="toggleMusic()" class="p-3 bg-white rounded-xl shadow-sm border border-gray-100 hover:bg-gray-50 transition" title="Toggle Background Music">
+                    <span id="musicIcon">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                        </svg>
+                    </span>
+                </button>
+                <h1 class="text-3xl md:text-4xl text-gray-800">Family Wheel</h1>
+            </div>
+
+            <div class="flex gap-2">
+                <button onclick="resetApp()" class="px-4 py-2 text-gray-500 hover:text-red-500 text-sm font-medium transition">Reset Board</button>
+                <button onclick="toggleDrawer()" class="px-6 py-2 bg-blue-600 text-white rounded-full font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200">
+                    Manage Participants
+                </button>
+            </div>
+        </header>
+
+        <!-- Content Area: Fills remaining height -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch overflow-hidden flex-grow pb-4">
+            <div class="hidden lg:block lg:col-span-1"></div>
+
+            <!-- Center: The Wheel Area -->
+            <div class="lg:col-span-7 flex flex-col items-center justify-center overflow-hidden">
+                <div id="wheel-container" onclick="handleWheelClick()">
+                    <svg id="wheel-pointer" viewBox="0 0 100 100">
+                        <path d="M20 50 L80 20 L80 80 Z" fill="#333" stroke="white" stroke-width="4"/>
+                    </svg>
+                    <canvas id="wheelCanvas" width="500" height="500" class="max-w-full h-auto"></canvas>
+                </div>
+                <div class="mt-6 text-center shrink-0">
+                    <p class="text-gray-400 font-medium animate-pulse">Click the wheel to spin!</p>
+                </div>
+            </div>
+
+            <!-- Right: Winners Area -->
+            <div class="lg:col-span-4 flex flex-col overflow-hidden">
+                <div class="card p-6 flex flex-col h-full overflow-hidden">
+                    <div class="flex items-center justify-between mb-6 border-b pb-4 shrink-0">
+                        <h2 class="text-xl text-gray-800 font-bold flex items-center">
+                            <span class="mr-2 text-yellow-500">🏆</span> Winners
+                        </h2>
+                        <button onclick="clearWinners()" id="clearWinnersBtn" class="text-xs text-blue-500 hover:underline hidden">
+                            Clear all
+                        </button>
+                    </div>
+                    <!-- This list takes all remaining height within the card -->
+                    <div id="winnersList" class="space-y-3 overflow-y-auto flex-grow pr-1 text-sm custom-scroll">
+                        <p class="text-gray-400 italic text-center py-10">Waiting for winners...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Celebration Overlay -->
+    <div id="winnerOverlay" class="winner-overlay">
+        <h2 class="text-white text-3xl mb-4 font-light uppercase tracking-widest">Congratulations!</h2>
+        <div class="bg-white px-16 py-10 rounded-3xl border-4 border-blue-500 shadow-2xl mb-8 transform scale-110">
+            <span id="winnerFinalName" class="winner-name text-6xl md:text-8xl text-gray-800 block"></span>
+        </div>
+        <button onclick="closeOverlay()" class="bg-blue-600 text-white px-12 py-4 rounded-full font-bold text-xl hover:bg-blue-500 transition shadow-xl">
+            CONTINUE
+        </button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('wheelCanvas');
+        const ctx = canvas.getContext('2d');
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        let participants = [];
+        let winners = [];
+        let startAngle = 0;
+        let arc = 0;
+        let spinTimeout = null;
+        let spinTime = 0;
+        let spinTimeTotal = 0;
+        let isSpinning = false;
+        let drumRollSource = null;
+        let drumRollGain = null;
+
+        // Background Music setup
+        const bgMusic = new Audio('bg_music.mp3');
+        bgMusic.loop = true;
+        bgMusic.volume = 0.4;
+        let isMusicPlaying = false;
+        
+        let baseAngle = 0;
+        let totalRotation = 0;
+        let lastFlickIndex = -1;
+
+        const colors = [
+            "#3369e8", "#d50f25", "#eeb211", "#009925", 
+            "#7030a0", "#ff6600", "#00bcd4", "#e91e63", 
+            "#8bc34a", "#607d8b"
+        ];
+
+        function toggleMusic() {
+            const iconContainer = document.getElementById('musicIcon');
+            if (isMusicPlaying) {
+                bgMusic.pause();
+                iconContainer.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                    </svg>
+                `;
+            } else {
+                bgMusic.play().catch(e => console.log('Music play blocked:', e));
+                iconContainer.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                    </svg>
+                `;
+            }
+            isMusicPlaying = !isMusicPlaying;
+        }
+
+        function toggleDrawer() {
+            const drawer = document.getElementById('side-drawer');
+            drawer.classList.toggle('drawer-hidden');
+            drawer.classList.toggle('drawer-visible');
+            if (drawer.classList.contains('drawer-visible')) {
+                document.getElementById('addNameInput').focus();
+            }
+        }
+
+        function addParticipant() {
+            const input = document.getElementById('addNameInput');
+            const name = input.value.trim();
+            if (name) {
+                participants.push(name);
+                input.value = "";
+                input.focus();
+                renderParticipantList();
+                drawWheel();
+            }
+        }
+
+        function removeParticipant(index) {
+            participants.splice(index, 1);
+            renderParticipantList();
+            drawWheel();
+        }
+
+        function renderParticipantList() {
+            const listEl = document.getElementById('participantList');
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const countDisplay = document.getElementById('countDisplay');
+            
+            countDisplay.innerText = participants.length;
+            
+            if (participants.length === 0) {
+                listEl.innerHTML = '<p class="text-gray-400 italic text-center py-4">No names added yet.</p>';
+                return;
+            }
+
+            const filtered = participants.map((name, index) => ({ name, index }))
+                .filter(item => item.name.toLowerCase().includes(searchTerm));
+
+            if (filtered.length === 0) {
+                listEl.innerHTML = '<p class="text-gray-400 italic text-center py-4">No matches found.</p>';
+                return;
+            }
+
+            listEl.innerHTML = filtered.map(item => `
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 hover:border-blue-200 transition">
+                    <span class="font-semibold text-gray-700 truncate mr-2">${item.name}</span>
+                    <button onclick="removeParticipant(${item.index})" class="text-gray-300 hover:text-red-500 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function drawWheel() {
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const outsideRadius = 240;
+            const textRadius = 180;
+            const insideRadius = 0;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (participants.length === 0) {
+                ctx.fillStyle = "#ffffff";
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, outsideRadius, 0, Math.PI * 2, false);
+                ctx.fill();
+                ctx.strokeStyle = "#e2e8f0";
+                ctx.lineWidth = 10;
+                ctx.stroke();
+                
+                ctx.fillStyle = "#94a3b8";
+                ctx.font = 'bold 20px Quicksand';
+                ctx.textAlign = "center";
+                ctx.fillText("Open drawer to add", centerX, centerY - 10);
+                ctx.fillText("participants!", centerX, centerY + 20);
+                return;
+            }
+
+            arc = Math.PI * 2 / participants.length;
+
+            participants.forEach((name, i) => {
+                const angle = startAngle + i * arc;
+                ctx.fillStyle = colors[i % colors.length];
+
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, outsideRadius, angle, angle + arc, false);
+                ctx.arc(centerX, centerY, insideRadius, angle + arc, angle, true);
+                ctx.fill();
+                ctx.strokeStyle = "rgba(255,255,255,0.2)";
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                ctx.save();
+                ctx.fillStyle = "white";
+                ctx.translate(centerX + Math.cos(angle + arc / 2) * textRadius, 
+                             centerY + Math.sin(angle + arc / 2) * textRadius);
+                ctx.rotate(angle + arc / 2); 
+                
+                const displayName = name.length > 18 ? name.substring(0, 16) + '...' : name;
+                ctx.font = 'bold 18px Quicksand';
+                ctx.textAlign = "right";
+                ctx.shadowBlur = 4;
+                ctx.shadowColor = "rgba(0,0,0,0.3)";
+                ctx.fillText(displayName, 50, 6);
+                ctx.restore();
+            });
+
+            ctx.fillStyle = "white";
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 30, 0, Math.PI * 2, false);
+            ctx.fill();
+            ctx.strokeStyle = "#333";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            const currentPointerIndex = Math.floor((Math.PI * 2 - (startAngle % (Math.PI * 2))) / arc);
+            if (currentPointerIndex !== lastFlickIndex && isSpinning) {
+                flickPointer();
+                lastFlickIndex = currentPointerIndex;
+            }
+        }
+
+        function flickPointer() {
+            const pointer = document.getElementById('wheel-pointer');
+            pointer.classList.add('pointer-flick');
+            setTimeout(() => pointer.classList.remove('pointer-flick'), 50);
+        }
+
+        function handleWheelClick() {
+            if (!isSpinning) spinWheel();
+        }
+
+        function playDrumRoll() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const bufferSize = 2 * audioCtx.sampleRate;
+            const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const output = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
+
+            drumRollSource = audioCtx.createBufferSource();
+            drumRollSource.buffer = noiseBuffer;
+            drumRollSource.loop = true;
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(400, audioCtx.currentTime);
+            drumRollGain = audioCtx.createGain();
+            drumRollGain.gain.setValueAtTime(0, audioCtx.currentTime);
+            drumRollGain.gain.linearRampToValueAtTime(0.2, audioCtx.currentTime + 0.5);
+            drumRollSource.connect(filter);
+            filter.connect(drumRollGain);
+            drumRollGain.connect(audioCtx.destination);
+            drumRollSource.start();
+        }
+
+        function stopDrumRoll() {
+            if (drumRollGain) {
+                drumRollGain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                setTimeout(() => {
+                    if (drumRollSource) {
+                        drumRollSource.stop();
+                        drumRollSource = null;
+                    }
+                }, 100);
+            }
+        }
+
+        function spinWheel() {
+            if (isSpinning || participants.length < 1) return;
+            isSpinning = true;
+            spinTime = 0;
+            // Fixed spin time to 6 seconds
+            spinTimeTotal = 6000; 
+            baseAngle = startAngle % (Math.PI * 2);
+            // Rotates roughly 8-12 full turns for a 6s spin
+            totalRotation = (Math.PI * 2 * 8) + (Math.random() * Math.PI * 2 * 4);
+            playDrumRoll();
+            rotateWheel();
+        }
+
+        function rotateWheel() {
+            spinTime += 16;
+            if (spinTime >= spinTimeTotal) {
+                stopRotateWheel();
+                return;
+            }
+            const progress = spinTime / spinTimeTotal;
+            const easing = 1 - Math.pow(1 - progress, 5);
+            startAngle = baseAngle + totalRotation * easing;
+            drawWheel();
+            spinTimeout = requestAnimationFrame(rotateWheel);
+        }
+
+        function stopRotateWheel() {
+            cancelAnimationFrame(spinTimeout);
+            stopDrumRoll();
+            startAngle = baseAngle + totalRotation;
+            drawWheel();
+            const degrees = (startAngle * 180 / Math.PI) % 360;
+            const arcd = arc * 180 / Math.PI;
+            const index = Math.floor((360 - degrees) / arcd);
+            const actualIndex = (index + participants.length) % participants.length;
+            const winner = participants.splice(actualIndex, 1)[0];
+            showWinner(winner);
+        }
+
+        function showWinner(name) {
+            winners.push(name);
+            document.getElementById('winnerFinalName').innerText = name;
+            document.getElementById('winnerOverlay').style.display = 'flex';
+            renderParticipantList();
+            updateWinnersHall();
+            createConfetti();
+            playWinnerSound();
+            drawWheel();
+            isSpinning = false;
+        }
+
+        function updateWinnersHall() {
+            const list = document.getElementById('winnersList');
+            const clearBtn = document.getElementById('clearWinnersBtn');
+            if (winners.length === 0) {
+                list.innerHTML = '<p class="text-gray-400 italic text-center py-10">Waiting for winners...</p>';
+                clearBtn.classList.add('hidden');
+                return;
+            }
+            clearBtn.classList.remove('hidden');
+            const items = winners.map((name, index) => ({ name, originalIndex: index })).reverse();
+            list.innerHTML = items.map((item) => `
+                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100 mb-2 group transition hover:bg-white hover:shadow-md">
+                    <div class="flex items-center">
+                        <span class="font-bold text-blue-500 mr-3">#${item.originalIndex + 1}</span>
+                        <span class="font-bold text-gray-700 uppercase tracking-tight">${item.name}</span>
+                    </div>
+                    <button onclick="deleteWinner(${item.originalIndex})" class="text-gray-300 hover:text-red-500 transition-colors" title="Remove">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function deleteWinner(index) {
+            winners.splice(index, 1);
+            updateWinnersHall();
+        }
+
+        function clearWinners() {
+            if (confirm("Clear the winner history?")) {
+                winners = [];
+                updateWinnersHall();
+            }
+        }
+
+        function closeOverlay() {
+            document.getElementById('winnerOverlay').style.display = 'none';
+            document.querySelectorAll('.confetti').forEach(c => c.remove());
+        }
+
+        function playWinnerSound() {
+            // Using the requested Pixabay Tada sound
+            const audio = new Audio('https://cdn.pixabay.com/audio/2022/03/10/audio_c8c8a73a5a.mp3');
+            audio.play().catch(e => console.log('Audio playback prevented:', e));
+        }
+
+        function createConfetti() {
+            for (let i = 0; i < 60; i++) {
+                const c = document.createElement('div');
+                c.className = 'confetti';
+                c.style.left = Math.random() * 100 + 'vw';
+                c.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                c.style.animationDelay = Math.random() * 2 + 's';
+                document.body.appendChild(c);
+            }
+        }
+
+        function createDecorations() {
+            const container = document.getElementById('decoration-container');
+            const spawn = (type) => {
+                if (document.hidden) return;
+                const el = document.createElement('div');
+                el.className = 'decoration text-4xl';
+                if (type === 'balloon') {
+                    el.innerText = ['🎈', '🎈', '🎈', '🎡'][Math.floor(Math.random() * 4)];
+                    el.style.opacity = '0.8';
+                } else {
+                    el.innerText = ['⭐', '✨', '🌟', '💫'][Math.floor(Math.random() * 4)];
+                    el.style.opacity = '0.5';
+                }
+                el.style.left = Math.random() * 100 + 'vw';
+                el.style.fontSize = (Math.random() * 20 + 20) + 'px';
+                el.style.animationDuration = (Math.random() * 5 + 5) + 's';
+                container.appendChild(el);
+                setTimeout(() => el.remove(), 10000);
+            };
+            setInterval(() => spawn('balloon'), 1500);
+            setInterval(() => spawn('star'), 1000);
+        }
+
+        function resetApp() {
+            if (confirm("Reset the entire board? All names and history will be cleared.")) {
+                participants = [];
+                winners = [];
+                document.getElementById('addNameInput').value = "";
+                document.getElementById('searchInput').value = "";
+                renderParticipantList();
+                updateWinnersHall();
+                drawWheel();
+            }
+        }
+
+        createDecorations();
+        drawWheel();
+        renderParticipantList();
+    </script>
+</body>
+</html>
